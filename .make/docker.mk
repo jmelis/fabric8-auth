@@ -1,11 +1,28 @@
 DOCKER_IMAGE_CORE := $(PROJECT_NAME)
 DOCKER_IMAGE_DEPLOY := $(PROJECT_NAME)-deploy
+DOCKER_IMAGE_TARGET := fabric8-services/$(PROJECT_NAME):latest
 
 # If running in Jenkins we don't allow for interactively running the container
 ifneq ($(BUILD_TAG),)
 	DOCKER_RUN_INTERACTIVE_SWITCH :=
 else
 	DOCKER_RUN_INTERACTIVE_SWITCH := -i
+endif
+
+# Build file
+ifeq ($(TARGET),rhel)
+	DOCKERFILE_BUILD := Dockerfile.builder.rhel
+	DOCKERFILE_DEPLOY := Dockerfile.deploy.rhel
+
+	ifndef DOCKER_REGISTRY
+		$(error DOCKER_REGISTRY is not set)
+	endif
+
+	DOCKER_IMAGE_URL := $(DOCKER_REGISTRY)/$(DOCKER_IMAGE_TARGET)
+else
+	DOCKERFILE_BUILD := Dockerfile.builder
+	DOCKERFILE_DEPLOY := Dockerfile.deploy
+	DOCKER_IMAGE_URL := $(DOCKER_IMAGE_TARGET)
 endif
 
 # The workspace environment is set by Jenkins and defaults to /tmp if not set
@@ -25,18 +42,18 @@ PACKAGE_PATH=$(GOPATH_IN_CONTAINER)/src/$(PACKAGE_NAME)
 ## Builds the docker image used to build the software.
 docker-image-builder:
 	@echo "Building docker image $(DOCKER_IMAGE_CORE)"
-	docker build --quiet --build-arg USE_GO_VERSION_FROM_WEBSITE=$(USE_GO_VERSION_FROM_WEBSITE) -t $(DOCKER_IMAGE_CORE) -f $(CUR_DIR)/Dockerfile.builder $(CUR_DIR)
+	docker build --quiet --build-arg USE_GO_VERSION_FROM_WEBSITE=$(USE_GO_VERSION_FROM_WEBSITE) -t $(DOCKER_IMAGE_CORE) -f $(CUR_DIR)/$(DOCKERFILE_BUILD) $(CUR_DIR)
 
 .PHONY: docker-image-deploy
 ## Creates a runnable image using the artifacts from the bin directory.
 docker-image-deploy:
-	docker build -t $(DOCKER_IMAGE_DEPLOY) -f $(CUR_DIR)/Dockerfile.deploy $(CUR_DIR)
+	docker build -t $(DOCKER_IMAGE_DEPLOY) -f $(CUR_DIR)/$(DOCKERFILE_DEPLOY) $(CUR_DIR)
 
 .PHONY: docker-publish-deploy
 ## Tags the runnable image and pushes it to the docker hub.
 docker-publish-deploy:
-	docker tag $(DOCKER_IMAGE_DEPLOY) fabric8-services/fabric8-auth:latest
-	docker push fabric8-services/fabric8-auth:latest
+	docker tag $(DOCKER_IMAGE_DEPLOY) $(DOCKER_IMAGE_TARGET)
+	docker push $(DOCKER_IMAGE_URL)
 
 .PHONY: docker-build-dir
 ## Creates the docker build directory.

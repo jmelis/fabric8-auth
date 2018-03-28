@@ -102,9 +102,21 @@ function run_tests_with_coverage() {
 }
 
 function tag_push() {
-  TARGET=$1
-  docker tag fabric8-auth-deploy $TARGET
-  docker push $TARGET
+  local tag_target
+  tag_target=$1
+
+  docker tag fabric8-auth-deploy $tag_target
+
+  if [ "$TARGET" = "rhel" ]; then
+    if [ -z "${DOCKER_REGISTRY}" ]; then
+      echo "DOCKER_REGISTRY is not set" >&2
+      exit 1
+    fi
+
+    docker push "${DOCKER_REGISTRY}"/$tag_target
+  else
+    docker push $tag_target
+  fi
 }
 
 function deploy() {
@@ -114,10 +126,12 @@ function deploy() {
   TAG=$(echo $GIT_COMMIT | cut -c1-${DEVSHIFT_TAG_LEN})
   REGISTRY="push.registry.devshift.net"
 
-  if [ -n "${DEVSHIFT_USERNAME}" -a -n "${DEVSHIFT_PASSWORD}" ]; then
-    docker login -u ${DEVSHIFT_USERNAME} -p ${DEVSHIFT_PASSWORD} ${REGISTRY}
-  else
-    echo "Could not login, missing credentials for the registry"
+  if [ "${TARGET}" != "rhel" ]; then
+    if [ -n "${DEVSHIFT_USERNAME}" -a -n "${DEVSHIFT_PASSWORD}" ]; then
+      docker login -u ${DEVSHIFT_USERNAME} -p ${DEVSHIFT_PASSWORD} ${REGISTRY}
+    else
+      echo "Could not login, missing credentials for the registry"
+    fi
   fi
 
   tag_push ${REGISTRY}/fabric8-services/fabric8-auth:$TAG
