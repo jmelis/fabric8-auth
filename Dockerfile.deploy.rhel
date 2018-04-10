@@ -1,4 +1,4 @@
-FROM registry.devshift.net/osio-prod/fabric8-services/fabric8-auth-base:latest
+FROM registry.devshift.net/osio-prod/base/golang:latest
 ENV LANG=en_US.utf8
 ENV AUTH_INSTALL_PREFIX=/usr/local/auth
 
